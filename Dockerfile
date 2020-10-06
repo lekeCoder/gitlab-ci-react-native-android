@@ -37,8 +37,8 @@ ENV PATH "$PATH:${ANDROID_HOME}/tools"
 ENV DEBIAN_FRONTEND noninteractive
 
 ENV NVM_DIR /usr/local/nvm
-ENV NVM_VERSION v0.33.11
-ENV NODE_VERSION v10.18.1
+ENV NVM_VERSION v0.36.0
+ENV NODE_VERSION v14.13.0
 
 ENV GRADLE_HOME /opt/gradle
 ENV GRADLE_VERSION 4.6
@@ -148,5 +148,11 @@ RUN git config --global user.name "CI Server"
 #Install gcloud for Firebase Testlab
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install google-cloud-sdk -y
 
-#Install Node Firestore-import-export for Courtly
-RUN yarn global add node-firestore-import-export
+RUN npm install -g eslint
+
+#Install Ionic dependencies
+RUN npm install -g @ionic/cli
+RUN echo N | npm install -g @angular/cli
+RUN npm install -g cordova
+RUN npm install -g cordova-res --unsafe-perm
+
