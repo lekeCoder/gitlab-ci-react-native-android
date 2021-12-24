@@ -3,7 +3,7 @@
 #This script is for setting up a shell runner with an Android emulator for automatically taking screenshots
 #Make sure that the file package.txt is in the same folder as this script!
 
-#RUNNING INSTSTRUCTIONS
+#RUNNING INSTRUCTIONS
 #
 #Change user to gitlab-runner and switch to home folder:
 #
@@ -60,8 +60,8 @@ export PATH="$PATH:${ANDROID_HOME}/tools"
 export DEBIAN_FRONTEND=noninteractive
 
 export NVM_DIR=/usr/local/nvm
-export NVM_VERSION=v0.33.11
-export NODE_VERSION=v8.12.0
+export NVM_VERSION=v0.39.1
+export NODE_VERSION=v12.16.3
 
 export GRADLE_HOME=/opt/gradle
 export GRADLE_VERSION=4.6
