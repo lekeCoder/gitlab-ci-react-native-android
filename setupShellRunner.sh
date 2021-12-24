@@ -49,7 +49,7 @@ apt-get -qq update && \
 
 echo "Android SDK 28.0.3"
 export VERSION_SDK_TOOLS="4333796"
-export BUILD_TOOLS="26.0.0"
+export BUILD_TOOLS="28.0.3"
 export ANDROID_PLATFORM="android-28"
 
 export USER_HOME="/root" # If use ~ copy and move command will not work
