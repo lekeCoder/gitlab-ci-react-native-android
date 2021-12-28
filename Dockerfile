@@ -1,149 +1,110 @@
 #
 # GitLab CI react-native-android v0.1
 #
-# https://hub.docker.com/r/webcuisine/gitlab-ci-react-native-android/
-# https://github.com/cuisines/gitlab-ci-react-native-android
+# https://hub.docker.com/r/lekedocker/gitlab_ci_react_native_image
+# https://github.com/lekecoder/gitlab-ci-react-native-android 
 #
-
-FROM ubuntu:18.04
-
-RUN apt-get -qq update && \
-    apt-get install -qqy --no-install-recommends \
-      apt-utils \
-      bzip2 \
-      curl \
-      git-core \
-      html2text \
-      openjdk-8-jdk \
-      libc6-i386 \
-      lib32stdc++6 \
-      lib32gcc1 \
-      lib32ncurses5 \
-      lib32z1 \
-      unzip \
-      gnupg \
-      openssh-server \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN echo "Android SDK 28.0.3"
-ENV VERSION_SDK_TOOLS "4333796"
-ENV BUILD_TOOLS="26.0.0"
-ENV ANDROID_PLATFORM="android-25"
-
-ENV USER_HOME "/root"
-RUN echo "ANDROID_HOME: $USER_HOME/sdk"
-ENV ANDROID_HOME $USER_HOME/sdk
-ENV PATH "$PATH:${ANDROID_HOME}/tools"
-ENV DEBIAN_FRONTEND noninteractive
-
-ENV NVM_DIR /usr/local/nvm
-ENV NVM_VERSION v0.33.11
-ENV NODE_VERSION v8.12.0
-
+FROM ubuntu:20.04
+LABEL Description="This image provides a base Android development environment for React Native, and may be used to run tests."
+ENV DEBIAN_FRONTEND=noninteractive
+# set default build arguments
+ARG SDK_VERSION=commandlinetools-linux-6609375_latest.zip
+ARG ANDROID_BUILD_VERSION=30
+ARG ANDROID_TOOLS_VERSION=30.0.3
+ARG BUCK_VERSION=2020.10.21.01
+ARG NDK_VERSION=20.1.5948944
+ARG NODE_VERSION=14.x
+ARG WATCHMAN_VERSION=4.9.0
+ARG JAVA_VERION=11
+# set default environment variables
 ENV GRADLE_HOME /opt/gradle
-ENV GRADLE_VERSION 4.6
+ENV GRADLE_VERSION 6.9.1
+ENV VERSION_SDK_TOOLS "4333796"
+ENV ADB_INSTALL_TIMEOUT=10
+ENV ANDROID_HOME=/opt/android
+ENV ANDROID_SDK_HOME=${ANDROID_HOME}
+ENV ANDROID_NDK=${ANDROID_HOME}/ndk/$NDK_VERSION
+ENV JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERION}-openjdk-amd64
+ENV PATH=${ANDROID_NDK}:${ANDROID_HOME}/cmdline-tools/tools/bin:${ANDROID_HOME}/emulator:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/tools:${ANDROID_HOME}/tools/bin:/opt/buck/bin/:${PATH}
+# Install system dependencies
+RUN apt update -qq && apt install -qq -y --no-install-recommends \
+  apt-transport-https \
+  curl \
+  file \
+  gcc \
+  git \
+  g++ \
+  gnupg2 \
+  libc++1-10 \
+  libgl1 \
+  libtcmalloc-minimal4 \
+  make \
+  openjdk-${JAVA_VERION}-jdk-headless \
+  openssh-client \
+  python3 \
+  python3-distutils \
+  rsync \
+  ruby \
+  ruby-dev \
+  tzdata \
+  unzip \
+  sudo \
+  ninja-build \
+  zip \
+  && gem install bundler -v 2.2.22 \
+  && rm -rf /var/lib/apt/lists/*;
+# Refresh keys to prevent invalid signature
+RUN apt-key adv --refresh-keys --keyserver keyserver.ubuntu.com
+# install nodejs and yarn packages from nodesource and yarn apt sources
+RUN curl -sL https://deb.nodesource.com/setup_${NODE_VERSION} | bash - \
+  && echo "deb https://dl.yarnpkg.com/debian/ stable main" > /etc/apt/sources.list.d/yarn.list \
+  && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+  && apt-get update -qq \
+  && apt-get install -qq -y --no-install-recommends nodejs yarn \
+  && rm -rf /var/lib/apt/lists/*
+# # download and install buck using debian package
+# # https://jitpack.io/com/github/facebook/buck/v2020.10.21.01/buck-v2020.10.21.01-java11.pex
+# RUN curl -sS -L https://github.com/facebook/buck/releases/download/v${BUCK_VERSION}/buck.${BUCK_VERSION}_all.deb -o /tmp/buck.deb \
+#     && dpkg -i /tmp/buck.deb \
+#     && rm /tmp/buck.deb
+# Full reference at https://dl.google.com/android/repository/repository2-1.xml
 
-RUN rm -f /etc/ssl/certs/java/cacerts; \
-    /var/lib/dpkg/info/ca-certificates-java.postinst configure
+RUN mkdir -p $ANDROID_HOME
 
-RUN echo "Installing Sudo" \
-  && apt-get update && apt-get install sudo
-
-RUN echo "Installing inotify" \
-  && sudo apt-get install -y inotify-tools
-
-RUN curl -s https://dl.google.com/android/repository/sdk-tools-linux-${VERSION_SDK_TOOLS}.zip > $USER_HOME/sdk.zip && \
-    unzip $USER_HOME/sdk.zip -d $USER_HOME/sdk && \
-    rm -v $USER_HOME/sdk.zip
-
-RUN mkdir -p $ANDROID_HOME/licenses/ \
-  && echo "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license \
-  && echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
-
-ADD packages.txt $USER_HOME/sdk
-RUN mkdir -p $USER_HOME/.android && \
-  touch $USER_HOME/.android/repositories.cfg && \
-  ${ANDROID_HOME}/tools/bin/sdkmanager --update
-
-RUN while read -r package; do PACKAGES="${PACKAGES}${package} "; done < $USER_HOME/sdk/packages.txt && \
-    ${ANDROID_HOME}/tools/bin/sdkmanager ${PACKAGES}
-
-RUN ${ANDROID_HOME}/tools/bin/sdkmanager "emulator" "build-tools;${BUILD_TOOLS}" "platforms;${ANDROID_PLATFORM}" "system-images;${ANDROID_PLATFORM};google_apis;x86_64"
-
-RUN echo no | ${ANDROID_HOME}/tools/bin/avdmanager create avd -n "Android" -k "system-images;${ANDROID_PLATFORM};google_apis;x86_64" \
-  && ln -s ${ANDROID_HOME}/tools/emulator /usr/bin \
-  && ln -s ${ANDROID_HOME}/platform-tools/adb /usr/bin
-
-RUN echo "Installing Yarn Deb Source" \
-	&& curl -sS http://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
-	&& echo "deb http://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-
-RUN mkdir $NVM_DIR
-
-RUN echo "Installing NVM" \
-	&& curl -o- https://raw.githubusercontent.com/creationix/nvm/$NVM_VERSION/install.sh | bash
-
-ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
-ENV PATH $NVM_DIR/versions/node/$NODE_VERSION/bin:$PATH
-
-RUN echo "source $NVM_DIR/nvm.sh && \
-    nvm install $NODE_VERSION && \
-    nvm alias default $NODE_VERSION && \
-    nvm use default" | bash
+# download and unpack android
+RUN curl -sS https://dl.google.com/android/repository/${SDK_VERSION} -o /tmp/sdk.zip \
+  && mkdir -p ${ANDROID_HOME}/cmdline-tools \
+  && unzip -q -d ${ANDROID_HOME}/cmdline-tools /tmp/sdk.zip \
+  && rm /tmp/sdk.zip \
+  && yes | sdkmanager --licenses \
+  && yes | sdkmanager "platform-tools" \
+  "emulator" \
+  "platforms;android-$ANDROID_BUILD_VERSION" \
+  "build-tools;$ANDROID_TOOLS_VERSION" \
+  "cmake;3.10.2.4988404" \
+  "system-images;android-21;google_apis;armeabi-v7a" \
+  "ndk;$NDK_VERSION" \
+  && rm -rf ${ANDROID_HOME}/.android
 
 ENV BUILD_PACKAGES git yarn build-essential imagemagick librsvg2-bin ruby ruby-dev wget libcurl4-openssl-dev
 RUN echo "Installing Additional Libraries" \
-	 && rm -rf /var/lib/gems \
-	 && apt-get update && apt-get install $BUILD_PACKAGES -qqy --no-install-recommends
+  && rm -rf /var/lib/gems \
+  && apt-get update && apt-get install $BUILD_PACKAGES -qqy --no-install-recommends
 
 RUN echo "Installing Fastlane 2.61.0" \
-	&& gem install fastlane badge -N \
-	&& gem cleanup
+  && gem install fastlane badge -N \
+  && gem cleanup
 
 RUN echo "Downloading Gradle" \
-	&& wget --no-verbose --output-document=gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+  && wget --no-verbose --output-document=gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
 
 RUN echo "Installing Gradle" \
-	&& unzip gradle.zip \
-	&& rm gradle.zip \
-	&& mv "gradle-${GRADLE_VERSION}" "${GRADLE_HOME}/" \
-	&& ln --symbolic "${GRADLE_HOME}/bin/gradle" /usr/bin/gradle
+  && unzip gradle.zip \
+  && rm gradle.zip \
+  && mv "gradle-${GRADLE_VERSION}" "${GRADLE_HOME}/" \
+  && ln --symbolic "${GRADLE_HOME}/bin/gradle" /usr/bin/gradle
 
-# Install specific bundler version as we use fastlane and specify the bundler version in the Gemfile.lock in multiple projects
-RUN echo "Installing Bundler 2.0.1" \
-	&& gem install bundler -v 2.0.1
 
 RUN echo "Install zlib1g-dev for Bundler" \
   && apt-get install -qqy --no-install-recommends \
   zlib1g-dev
-
-# Install firebase-tools
-ENV FIREBASE_CLI_PATH /usr/local/bin/firebase
-RUN echo "Install firebase-tools" \
-  && curl -sL https://firebase.tools | bash
-
-# Install Watchman
-ENV WATCHMAN_VERSION=4.9.0
-RUN echo "Install Watchman" && \
-  apt-get update && apt-get install -qqy --no-install-recommends libssl-dev pkg-config libtool curl ca-certificates build-essential autoconf python-dev libpython-dev autotools-dev automake && \
-  curl -LO https://github.com/facebook/watchman/archive/v${WATCHMAN_VERSION}.tar.gz && \
-  tar xzf v${WATCHMAN_VERSION}.tar.gz && rm v${WATCHMAN_VERSION}.tar.gz && \
-  cd watchman-${WATCHMAN_VERSION} && ./autogen.sh && ./configure && make && make install && \
-  cd /tmp && rm -rf watchman-${WATCHMAN_VERSION}
-
-RUN echo "Install Git LFS" && \
-  curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh && \
-  apt-get update && apt-get install git-lfs
-
-#Clone via ssh instead of http
-#This is used for libraries that we clone from a private gitlab repo.
-#Setup see here https://divan.github.io/posts/go_get_private/
-RUN echo "[url \"git@gitlab.com:\"]\n\tinsteadOf = https://gitlab.com/" >> $USER_HOME/.gitconfig
-RUN mkdir /root/.ssh && echo "StrictHostKeyChecking no " > $USER_HOME/.ssh/config
-
-#Add user into Git Config
-RUN git config --global user.email server@simyasolutions.com
-RUN git config --global user.name "CI Server"
-
-#Install gcloud for Firebase Testlab
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install google-cloud-sdk -y
